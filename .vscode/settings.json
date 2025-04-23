@@ -1,0 +1,17 @@
+{
+    "cSpell.words": [
+        "addstr",
+        "endwin",
+        "Frontlogo",
+        "getch",
+        "getmouse",
+        "getstr",
+        "keypresses",
+        "leetsolver",
+        "mousemask",
+        "napms",
+        "nodelay",
+        "noecho",
+        "stdscr"
+    ]
+}

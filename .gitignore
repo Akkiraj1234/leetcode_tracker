@@ -1,0 +1,3 @@
+# Files I don't want to track
+/learning_docs/  
+.venv/ 
