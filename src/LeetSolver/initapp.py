@@ -10,27 +10,31 @@
 # 7. if not correct create the default file in the folder
 # 8. if correct return the databse obeject
 
-from LeetSolver.utils import (
+from LeetSolver.validators import (
     validate_sqlite_database,
-    validate_json_file,
-    ISpathreadandwritable
+    validate_json_file
 )
 from LeetSolver.error import (
     LeetSolverError,
     FolderValidationError
 )
+from LeetSolver.utils import ISpathreadandwritable
 from typing import Optional
 from pathlib import Path
 
 
+# scema and constants and data
 __DIR_NAME = ".leetsolver"
+
 __DIR_LIST = [
     Path("~").expanduser().resolve(),
     Path(__file__).resolve().parents[2]
 ]
+
 __DEFULT_SETTINGS = {
     "logoid" : 0
 }
+
 __DEFAULT_SQLITE_SCHEMA = {
     "questions": {
         "columns": {
@@ -71,14 +75,24 @@ __DEFAULT_SQLITE_SCHEMA = {
         }
     }
 }
-__REQUIRED_FILES:list[dict[str:str,str:dict,str:callable]] = [
-    {"name": "settings.json", "schema": __DEFULT_SETTINGS, "validate": validate_json_file},
-    {"name": "database.db", "schema": __DEFAULT_SQLITE_SCHEMA, "validate": validate_sqlite_database},
+
+__REQUIRED_FILES = [
+    {
+        "name": "settings.json",
+        "schema": __DEFULT_SETTINGS,
+        "validate": validate_json_file
+    },
+    {
+        "name": "database.db",
+        "schema": __DEFAULT_SQLITE_SCHEMA,
+        "validate": validate_sqlite_database
+    },
     # {"name": "pyui_extenstiones", "schema": None, "validate": validate_pyfolder},    #will work on future
     # {"name": "pyicons", "schema": None, "validate": validate_pyfolder}               #will work on future
 ]
 
 
+# main code
 class Database:
     def __init__(self, path: Path):
         self.path = path
@@ -88,8 +102,8 @@ def get_dirpath() -> Optional[Path]:
     Get or create the LeetSolver directory path.
 
     1. If an existing path is found and is writable, return it.
-    2. Else, try to create it in one of the base dirs.
-    3. Return None if all fail.
+    2. Otherwise, try to create it in one of the base directories.
+    3. Return None if all attempts fail.
     """
     for base_dir in __DIR_LIST:
         path = Path(base_dir) / __DIR_NAME
@@ -109,6 +123,7 @@ def get_dirpath() -> Optional[Path]:
 def validate_DIR(path: Path) -> None:
     """
     Validate the directory's required files.
+
     1. Loops through each file in the required file list.
     2. For each file, runs its associated validation method with the default schema and fix=True.
        - If the file is broken, the validation method tries to fix it silently.
@@ -116,7 +131,7 @@ def validate_DIR(path: Path) -> None:
     3. If validation fails (e.g., unrecoverable error or file can't be fixed/created), 
        an exception is raised.
     4. This function catches those exceptions and raises a LeetSolverError instead.
-    5. If the function completes without error, the directory is valid and ready.
+    5. If the function completes without error, the directory is valid and ready to use.
     """
     for file in __REQUIRED_FILES:
         try:
@@ -125,44 +140,24 @@ def validate_DIR(path: Path) -> None:
             raise LeetSolverError(f"Initialization failed due to a technical error: {e}")
 
 def init() -> Database:
+    """
+    Initialize the LeetSolver application.
+
+    1. Locate or create the required directory for LeetSolver.
+    2. Validate the directory and its required files.
+    3. Return a Database object if initialization is successful.
+
+    Raises:
+        FolderValidationError: If the directory cannot be created or accessed.
+        LeetSolverError: If directory validation fails.
+
+    Returns:
+        Database: A Database object initialized with the directory path.
+    """
     path = get_dirpath()
     
     if path is None:
-        raise FolderValidationError("[Error:001] make sure /home/user dir have writing permmison")
+        raise FolderValidationError("[Error:001] Ensure the /home/user directory has write permissions.")
     
     validate_DIR(path)
     return Database(path)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# __DEFULT_BANNNER = {
-#     "name": "defult-bot",
-#     "size": (7, 5),
-#     "frame-rate": 2,
-#     "frame": [
-#         [
-#             (" ╭───╮ ", " ◉ ◉ | ", " ╰───╯ ", "   │   ", "   o   "),
-#             (" ╭───╮ ", " - - | ", " ╰───╯ ", "   │   ", "   o   ")
-#         ]
-#     ]
-# }

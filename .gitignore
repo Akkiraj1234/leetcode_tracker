@@ -1,3 +1,9 @@
 # Files I don't want to track
 /learning_docs/  
 .venv/ 
+
+
+/src/LeetSolver/.dustbin.py
+
+__pycache__*
+.leetsolver/*
