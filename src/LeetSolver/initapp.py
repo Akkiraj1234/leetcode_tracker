@@ -11,8 +11,9 @@
 # 8. if correct return the databse obeject
 
 from LeetSolver.utils import (
+    validate_sqlite_database,
     validate_json_file,
-    validate_database
+    ISpathreadandwritable
 )
 from LeetSolver.error import (
     LeetSolverError,
@@ -20,27 +21,59 @@ from LeetSolver.error import (
 )
 from typing import Optional
 from pathlib import Path
-import os
 
 
-__DIR_LIST = [
-    os.path.abspath(os.path.expanduser("~")),
-    os.path.dirname(os.path.abspath(__file__))
-]
 __DIR_NAME = ".leetsolver"
+__DIR_LIST = [
+    Path("~").expanduser().resolve(),
+    Path(__file__).resolve().parents[2]
+]
 __DEFULT_SETTINGS = {
     "logoid" : 0
 }
-__DEFULT_SQLITE_SCEMA = {
+__DEFAULT_SQLITE_SCHEMA = {
     "questions": {
-        "question_id": "TEXT PRIMARY KEY",
-        "name": "TEXT NOT NULL"
-        ""
+        "columns": {
+            "question_id":        "TEXT PRIMARY KEY",
+            "name":               "TEXT NOT NULL",
+            "difficulty":         "TEXT CHECK(difficulty IN ('Easy', 'Medium', 'Hard'))",
+            "first_solved":       "DATE",
+            "last_solved":        "DATE",
+            "total_solved":       "INTEGER DEFAULT 0",
+            "personal_rating":    "INTEGER CHECK(personal_rating BETWEEN 1 AND 10)",
+            "best_rating":        "INTEGER",
+            "current_rating":     "INTEGER",
+            "magic_score":        "REAL",
+            "tags":               "TEXT",
+            "notes":              "TEXT"
+        }
+    },
+    "daily_log": {
+        "columns": {
+            "id":                 "INTEGER PRIMARY KEY AUTOINCREMENT",
+            "date":               "DATE NOT NULL",
+            "question_id":        "TEXT NOT NULL",
+            "time_taken":         "INTEGER",
+            "success":            "BOOLEAN",
+            "revision_status":    "BOOLEAN",
+        },
+        "constraints": [
+            "FOREIGN KEY(question_id) REFERENCES questions(question_id)"
+        ]
+    },
+    "weekly_summary": {
+        "columns": {
+            "week_start":         "DATE PRIMARY KEY",
+            "total_questions":    "INTEGER",
+            "easy_count":         "INTEGER",
+            "medium_count":       "INTEGER",
+            "hard_count":         "INTEGER"
+        }
     }
 }
 __REQUIRED_FILES:list[dict[str:str,str:dict,str:callable]] = [
     {"name": "settings.json", "schema": __DEFULT_SETTINGS, "validate": validate_json_file},
-    {"name": "database.db", "schema": __DEFULT_SQLITE_SCEMA, "validate": validate_database},
+    {"name": "database.db", "schema": __DEFAULT_SQLITE_SCHEMA, "validate": validate_sqlite_database},
     # {"name": "pyui_extenstiones", "schema": None, "validate": validate_pyfolder},    #will work on future
     # {"name": "pyicons", "schema": None, "validate": validate_pyfolder}               #will work on future
 ]
@@ -49,8 +82,6 @@ __REQUIRED_FILES:list[dict[str:str,str:dict,str:callable]] = [
 class Database:
     def __init__(self, path: Path):
         self.path = path
-        # self.connection = sqlite3.connect(path)
-        # self.cursor = self.connection.cursor()
 
 def get_dirpath() -> Optional[Path]:
     """
@@ -62,7 +93,7 @@ def get_dirpath() -> Optional[Path]:
     """
     for base_dir in __DIR_LIST:
         path = Path(base_dir) / __DIR_NAME
-        if path.exists() and os.access(path, os.W_OK):
+        if path.exists() and ISpathreadandwritable(path):
             return path  
 
     for base_dir in __DIR_LIST:
@@ -72,7 +103,7 @@ def get_dirpath() -> Optional[Path]:
             return path
         except Exception:
             pass 
-        
+    
     return None
 
 def validate_DIR(path: Path) -> None:
@@ -93,7 +124,7 @@ def validate_DIR(path: Path) -> None:
         except Exception as e:
             raise LeetSolverError(f"Initialization failed due to a technical error: {e}")
 
-def init() -> None:
+def init() -> Database:
     path = get_dirpath()
     
     if path is None:
@@ -101,6 +132,27 @@ def init() -> None:
     
     validate_DIR(path)
     return Database(path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # __DEFULT_BANNNER = {
