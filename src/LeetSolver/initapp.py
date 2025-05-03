@@ -18,7 +18,7 @@ from LeetSolver.error import (
     LeetSolverError,
     FolderValidationError
 )
-from LeetSolver.utils import ISpathreadandwritable
+from LeetSolver.utils import IsPathReadAndWritable
 from typing import Optional
 from pathlib import Path
 
@@ -32,48 +32,73 @@ __DIR_LIST = [
 ]
 
 __DEFULT_SETTINGS = {
-    "logoid" : 0
+    "logoid" : 0,
 }
 
+# make sure scmea is currect degined else riase error
 __DEFAULT_SQLITE_SCHEMA = {
-    "questions": {
-        "columns": {
-            "question_id":        "TEXT PRIMARY KEY",
-            "name":               "TEXT NOT NULL",
-            "difficulty":         "TEXT CHECK(difficulty IN ('Easy', 'Medium', 'Hard'))",
-            "first_solved":       "DATE",
-            "last_solved":        "DATE",
-            "total_solved":       "INTEGER DEFAULT 0",
-            "personal_rating":    "INTEGER CHECK(personal_rating BETWEEN 1 AND 10)",
-            "best_rating":        "INTEGER",
-            "current_rating":     "INTEGER",
-            "magic_score":        "REAL",
-            "tags":               "TEXT",
-            "notes":              "TEXT"
-        }
-    },
-    "daily_log": {
-        "columns": {
-            "id":                 "INTEGER PRIMARY KEY AUTOINCREMENT",
-            "date":               "DATE NOT NULL",
-            "question_id":        "TEXT NOT NULL",
-            "time_taken":         "INTEGER",
-            "success":            "BOOLEAN",
-            "revision_status":    "BOOLEAN",
+    "__version__": "v1",
+    "__on_upgrade__": None,
+    "Tables": [
+        {
+            "name": "questions",
+            "columns": (
+                (0, 'question_id', 'TEXT', 1, None, 1),
+                (1, 'name', 'TEXT', 1, None, 0),
+                (2, 'difficulty', 'TEXT', 0, None, 0, "CHECK(difficulty IN ('Easy', 'Medium', 'Hard'))"),
+                (3, 'first_solved', 'DATE', 0, None, 0),
+                (4, 'last_solved', 'DATE', 0, None, 0),
+                (5, 'total_solved', 'INTEGER', 0, '0', 0),
+                (6, 'personal_rating', 'INTEGER', 0, None, 0, "CHECK(personal_rating BETWEEN 1 AND 10)"),
+                (7, 'best_rating', 'INTEGER', 0, None, 0),
+                (8, 'current_rating', 'INTEGER', 0, None, 0),
+                (9, 'magic_score', 'REAL', 0, None, 0),
+                (10, 'tags', 'TEXT', 0, None, 0),
+                (11, 'notes', 'TEXT', 0, None, 0)
+            ),
+            "constraints": {
+                "FOREIGN KEY": [],
+                "UNIQUE": []
+            },
+            "outer_statement": None
         },
-        "constraints": [
-            "FOREIGN KEY(question_id) REFERENCES questions(question_id)"
-        ]
-    },
-    "weekly_summary": {
-        "columns": {
-            "week_start":         "DATE PRIMARY KEY",
-            "total_questions":    "INTEGER",
-            "easy_count":         "INTEGER",
-            "medium_count":       "INTEGER",
-            "hard_count":         "INTEGER"
+        {
+            "name": "daily_log",
+            "columns":(
+                (0, 'id', 'INTEGER', 1, None, 1, "AUTOINCREMENT"),
+                (1, 'date', 'DATE', 1, None, 0),
+                (2, 'question_id', 'TEXT', 1, None, 0),
+                (3, 'time_taken', 'INTEGER', 0, None, 0),
+                (4, 'success', 'BOOLEAN', 0, None, 0),
+                (5, 'revision_status', 'BOOLEAN', 0, None, 0)
+            ),
+            "constraints": {
+                "FOREIGN KEY": [
+                    "FOREIGN KEY(question_id) REFERENCES questions(question_id)"
+                ],
+                "UNIQUE": []
+            },
+            "outer_statement": None
+        },
+        {
+            "name": "weekly_summary",
+            "columns": (
+                (0, 'week_start', 'DATE', 1, None, 1, "PRIMARY KEY"),
+                (1, 'total_questions', 'INTEGER', 0, None, 0),
+                (2, 'easy_count', 'INTEGER', 0, None, 0),
+                (3, 'medium_count', 'INTEGER', 0, None, 0),
+                (4, 'hard_count', 'INTEGER', 0, None, 0)
+            ),
+            "constraints": {
+                "FOREIGN KEY": [],
+                "UNIQUE": []
+            },
+            "outer_statement": None
         }
-    }
+        
+    ],
+    "Triggers": { },
+    "Indexes": { },
 }
 
 __REQUIRED_FILES = [
@@ -86,9 +111,7 @@ __REQUIRED_FILES = [
         "name": "database.db",
         "schema": __DEFAULT_SQLITE_SCHEMA,
         "validate": validate_sqlite_database
-    },
-    # {"name": "pyui_extenstiones", "schema": None, "validate": validate_pyfolder},    #will work on future
-    # {"name": "pyicons", "schema": None, "validate": validate_pyfolder}               #will work on future
+    }
 ]
 
 
@@ -107,7 +130,7 @@ def get_dirpath() -> Optional[Path]:
     """
     for base_dir in __DIR_LIST:
         path = Path(base_dir) / __DIR_NAME
-        if path.exists() and ISpathreadandwritable(path):
+        if path.exists() and IsPathReadAndWritable(path):
             return path  
 
     for base_dir in __DIR_LIST:
