@@ -1,13 +1,13 @@
 from LeetSolver.utils import (
     IsPathReadAndWritable,
-    IsPathExistAndUsable,
-    IsVersionCompatible
+    IsVersionCompatible,
+    remove_whitespace,
 )
 from LeetSolver.error import (
     ValidationError, 
     PermissionErrorLS
 )
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 from pathlib import Path 
 import sqlite3
 import json
@@ -48,8 +48,12 @@ def validate_json_file(json_fp: Path, schema: Optional[Dict] = None, **kw) -> No
     Returns True if successful, raises ValidationError otherwise.
     """
     # check if json data is valid or not if yeah continue
-    if not IsPathExistAndUsable(json_fp):
-        raise PermissionErrorLS(json_fp, "read and write")
+    if json_fp.exists():
+        if not IsPathReadAndWritable(json_fp):
+            raise PermissionErrorLS(json_fp, "read and write")
+        
+    elif not kw.get("fix", False):
+        raise ValidationError("json file", "no json file exists")
     
     try:
         with open(json_fp, 'r', encoding="utf-8") as file: 
@@ -74,6 +78,8 @@ def validate_json_file(json_fp: Path, schema: Optional[Dict] = None, **kw) -> No
 # [done] if tables is missing create it with schema
 # [----] if colume Corrupted create a new table.
 # [----] if anything mismatched in sqlite3 create a new table.
+# [---1] fix `sqlite_table_issues` finish the colume missmatch finder
+# [---2] fix `validate_sqlite_tables` finish the `issue` analysis work.
 # [not yet] create backup and estire from backup
 # [not yet] data extractor to extract data from broken table
 # [not yet] Handle databae locks with rety mechanisms.
@@ -162,28 +168,64 @@ def create_sqlite_table_query(schema: Dict) -> str:
     column_definitions = [build_sqlite_column_definition(col) for col in schema["columns"]]
     constraints = schema["constraints"]["FOREIGN KEY"] + schema["constraints"]["UNIQUE"]
     all_definitions = ", ".join(column_definitions + constraints)
-    return f"CREATE TABLE {schema['name']} ({all_definitions}) {schema["outer_statement"]};"
+    return f"CREATE TABLE {schema['name']} ({all_definitions}){schema['outer_statement']};"
 
-def create_sqlite_tables(connection: sqlite3.Connection, table_schema: Dict) -> None:
+def sqlite_table_issues(cursor: sqlite3.Cursor, table_schema: Dict) -> Dict:
     """
-    Creates all tables defined in the full schema dictionary.
+    Compares declared schema against actual SQLite table.
+    Returns what parts are missing (columns, constraints, etc).
+    Used for backing up data safely before schema migration.
     """
-    cursor = connection.cursor()
-    for table_schema in table_schema["Tables"]:
+    # Get real schema info
+    table_info = cursor.execute(f"PRAGMA table_info({table_schema['name']});").fetchall()
+    create_table_sql = remove_whitespace(cursor.execute(
+        f'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "{table_schema["name"]}";'
+    ).fetchone()[0])
+    
+    issues = {
+        "columns_exists": [],
+        "columns_missing": [],
+        "FOREIGN KEY": [],
+        "UNIQUE": [],
+        "outer_statement": False
+    }
+
+    # Check columns by name only (you can add more detail if needed)
+    for column in table_schema["columns"]:
+        index = 0
+        while index < len(table_info):
+            if column[1] == table_info[index][1]:
+                col = table_info.pop(index)
+                # will check colume level issues for rn we not gonna modify it
+                issues["columns_exists"].append(col)
+                break
+            index += 1
+        else:
+            issues["columns_missing"].append(column[0])
+
+    # Check constraints 
+    for constraint_type in ("FOREIGN KEY", "UNIQUE"):
+        for idx, constraint in enumerate(table_schema["constraints"][constraint_type]):
+            if remove_whitespace(constraint) not in create_table_sql:
+                issues[constraint_type].append(idx)
+
+    # Check outer statement
+    outer_stmt = table_schema.get("outer_statement")
+    if outer_stmt and remove_whitespace(outer_stmt) not in create_table_sql:
+        issues["outer_statement"] = True
+
+    return issues
+
+def validate_sqlite_tables(cursor: sqlite3.Cursor, issue: Union[str, Dict], table_schema: Dict) -> None:
+    # the analysing of issue section havent been implemented yet and its big issue
+    # becouse recreation means data loss and when to delete and when to pass
+    # i need to write the basic verstion too so that will be written for rn i will pass
+    # if issue isnt str 
+    if isinstance(issue, str) and issue == "not_exists":
         try:
             cursor.execute(create_sqlite_table_query(table_schema))
         except sqlite3.DatabaseError as e:
             raise ValidationError("sqlite", e)
-    connection.commit()
-
-def sqlite_table_issue(cursor: sqlite3.Connection, table_schema: Dict) -> None:
-    table_info = cursor.execute(f"PRAGMA table_info({table_schema["name"]});").fetchall()
-    table_info_quary = cursor.execute(
-        f'SELECT sql FROM sqlite_master WHERE type = "table" AND name = "{table_schema['name']}";'
-    )
-
-def validate_sqlite_tables(connection: sqlite3.Connection, issue, table_schema) -> None:
-    pass
 
 def validate_sqlite_database(sqlite3_fp: Path, schema: Optional[Dict] = None, **kw) -> None:
     """
@@ -192,7 +234,6 @@ def validate_sqlite_database(sqlite3_fp: Path, schema: Optional[Dict] = None, **
     If the database is corrupted or missing, it creates a new file if `fix=True`.
     Ensures that all tables, columns, and constraints in the schema exist in the database.
     Returns True if successful, raises ValidationError otherwise.
-    the base dir shuld have read and write permison enable
     
     Args:
         sqlite3_fp (Path): Path to the SQLite3 database file.
@@ -201,17 +242,20 @@ def validate_sqlite_database(sqlite3_fp: Path, schema: Optional[Dict] = None, **
 
     Raises:
         ValidationError: If validation fails and `fix=False`.
-        PermissionErrorLS
+        PermissionErrorLS: If the file is not accessible.
+    Note: 
+        we asume that parent directory have read nad write permison.
     """
     # check if database exists and have read and write permison or not
-    if not sqlite3_fp.exists() and not kw.get("fix", False):
+    if sqlite3_fp.exists():
+        if not IsPathReadAndWritable(sqlite3_fp):
+            raise PermissionErrorLS(sqlite3_fp, "read and write")
+        
+    elif not kw.get("fix", False):
         raise ValidationError("sqlite3 database", "no sqlite3 database exists")
     
-    if not IsPathReadAndWritable(sqlite3_fp):
-        raise PermissionErrorLS(sqlite3_fp, "read and write")
-    
-    # databse validation prossess databse either be connected or created
-    with sqlite3.connect(Path,timeout = 5) as conn:
+    # database validation process: database will either be connected or created
+    with sqlite3.connect(str(sqlite3_fp), timeout = 5) as conn:
         cursor = conn.cursor()
         if not IsVersionCompatible(cursor.execute("SELECT sqlite_version();").fetchone()[0], __REQUIRED_VERSION):
             raise ValidationError("sqlite3 database", f"the version of sqlite3 database is < {__REQUIRED_VERSION}")
@@ -224,53 +268,8 @@ def validate_sqlite_database(sqlite3_fp: Path, schema: Optional[Dict] = None, **
             "SELECT name FROM sqlite_master WHERE type='table';").fetchall())
         
         # checking tables
-        for table_schema in schema["Tables"].items():
-            issue = sqlite_table_issue(cursor, table_schema)
+        for table_schema in schema["Tables"]:
+            issue = sqlite_table_issues(cursor, table_schema) if table_schema["name"] in tables_list else "not_exists"
             validate_sqlite_tables(cursor, issue, table_schema)
-            
-        # checking Triggers and Indexes and fixing it.
-        conn.commit()
-
-
-
-
-
-
-
-
-
-
-#     # Validate columns
-#     cursor.execute(f"PRAGMA table_info({table_name});")
-#     existing_columns = {col[1]: col[2] for col in cursor.fetchall()}  # {name: type}
-#     for column_name, column_type in table_schema["columns"].items():
-#         if column_name not in existing_columns:
-#             if not kw.get("fix", False):
-#                 raise ValidationError(
-#                     f"Column '{column_name}' is missing in table '{table_name}'."
-#                 )
-#             # Add the missing column if fix=True
-#             cursor.execute(
-#                 f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type};"
-#             )
-#         elif existing_columns[column_name] != column_type:
-#             if not kw.get("fix", False):
-#                 raise ValidationError(
-#                     f"Column '{column_name}' in table '{table_name}' has a mismatched type."
-#                 )
-#             # Handle mismatched column types (optional: create new column and migrate data)
-#             new_column_name = f"{column_name}_new"
-#             cursor.execute(
-#                 f"ALTER TABLE {table_name} ADD COLUMN {new_column_name} {column_type};"
-#             )
-#             cursor.execute(
-#                 f"UPDATE {table_name} SET {new_column_name} = {column_name};"
-#             )
-#             # Drop and rename logic (if supported by SQLite)
-
-#     # Validate constraints (foreign keys)
-#     if "constraints" in table_schema:
-#         for constraint in table_schema["constraints"]:
-#             # SQLite does not provide a direct way to check constraints, so this is a placeholder
-#             # You can implement additional logic to validate constraints if needed
-#             pass
+        
+    conn.commit()

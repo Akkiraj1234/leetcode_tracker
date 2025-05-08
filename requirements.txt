@@ -1,0 +1,16 @@
+certifi==2025.1.31
+charset-normalizer==3.4.1
+idna==3.10
+iniconfig==2.1.0
+markdown-it-py==3.0.0
+mdurl==0.1.2
+numpy==2.2.4
+packaging==25.0
+plotext==5.3.2
+pluggy==1.5.0
+Pygments==2.19.1
+pytest==8.3.5
+requests==2.32.3
+rich==13.9.4
+termplotlib==0.3.9
+urllib3==2.3.0

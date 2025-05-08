@@ -28,7 +28,7 @@ __DIR_NAME = ".leetsolver"
 
 __DIR_LIST = [
     Path("~").expanduser().resolve(),
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parent.parent
 ]
 
 __DEFULT_SETTINGS = {
@@ -60,7 +60,7 @@ __DEFAULT_SQLITE_SCHEMA = {
                 "FOREIGN KEY": [],
                 "UNIQUE": []
             },
-            "outer_statement": None
+            "outer_statement": ""
         },
         {
             "name": "daily_log",
@@ -78,12 +78,12 @@ __DEFAULT_SQLITE_SCHEMA = {
                 ],
                 "UNIQUE": []
             },
-            "outer_statement": None
+            "outer_statement": ""
         },
         {
             "name": "weekly_summary",
             "columns": (
-                (0, 'week_start', 'DATE', 1, None, 1, "PRIMARY KEY"),
+                (0, 'week_start', 'DATE', 1, None, 1),
                 (1, 'total_questions', 'INTEGER', 0, None, 0),
                 (2, 'easy_count', 'INTEGER', 0, None, 0),
                 (3, 'medium_count', 'INTEGER', 0, None, 0),
@@ -93,7 +93,7 @@ __DEFAULT_SQLITE_SCHEMA = {
                 "FOREIGN KEY": [],
                 "UNIQUE": []
             },
-            "outer_statement": None
+            "outer_statement": ""
         }
         
     ],
@@ -101,13 +101,16 @@ __DEFAULT_SQLITE_SCHEMA = {
     "Indexes": { },
 }
 
+# Warning dont modify
 __REQUIRED_FILES = [
     {
+        "var": "settings",
         "name": "settings.json",
         "schema": __DEFULT_SETTINGS,
         "validate": validate_json_file
     },
     {
+        "var": "database",
         "name": "database.db",
         "schema": __DEFAULT_SQLITE_SCHEMA,
         "validate": validate_sqlite_database
@@ -117,8 +120,7 @@ __REQUIRED_FILES = [
 
 # main code
 class Database:
-    def __init__(self, path: Path):
-        self.path = path
+    pass
 
 def get_dirpath() -> Optional[Path]:
     """
@@ -156,11 +158,14 @@ def validate_DIR(path: Path) -> None:
     4. This function catches those exceptions and raises a LeetSolverError instead.
     5. If the function completes without error, the directory is valid and ready to use.
     """
+    database = Database()
     for file in __REQUIRED_FILES:
         try:
             file['validate'](path / file['name'], schema=file['schema'], fix=True)
+            setattr(database, file["var"], path / file['name'])
         except Exception as e:
             raise LeetSolverError(f"Initialization failed due to a technical error: {e}")
+    return database
 
 def init() -> Database:
     """
@@ -182,5 +187,4 @@ def init() -> Database:
     if path is None:
         raise FolderValidationError("[Error:001] Ensure the /home/user directory has write permissions.")
     
-    validate_DIR(path)
-    return Database(path)
+    return validate_DIR(path)
