@@ -4,7 +4,6 @@ from LeetSolver.initapp import init
 
 def main():
     backend = init()
-    print(backend.path)
     
 if __name__ == "__main__":
     main()
